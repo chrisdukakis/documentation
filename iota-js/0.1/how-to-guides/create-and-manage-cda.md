@@ -48,10 +48,10 @@ To avoid address reuse, we recommend creating CDAs with either the `multi_use` f
 
     ```js
     account.generateCDA({
-    timeoutAt: new Date('7-16-2186').getTime() / 1000, // Date in seconds
-    multiUse: true,
-    expectedAmount: 10000000,
-    security: 2,
+        timeoutAt: Math.floor(new Date('7-16-2186').getTime() / 1000), // Date in seconds
+        multiUse: true,
+        expectedAmount: 10000000,
+        security: 2,
     })
         .then(cda => {
             // Do something with the CDA
@@ -71,24 +71,26 @@ The `generateCDA()` method returns a CDA object with the following fields:
    address: 'AT9GOVPQDDKAJ...ADFA9IRSV', // The last 9 trytes are the checksum
    timeoutAt: 6833278800,
    multiUse: false,
-   expectedAmount: 1000,
-   magnetLink: 'iota://AT9GOVPQD...ADFA9IRSV?timeout_at=6833278800&multi_use=false&expected_amount:1000'
+   expectedAmount: 1000
 }
 ```
 
 ## Distribute a CDA
 
-Because CDAs are descriptive objects, you can serialize them into any format and distribute them. For example, the `generateCDA()` method returns a serialized CDA as a magent link in a `magnetLink` field:
+Because CDAs are descriptive objects, you can serialize them into any format and distribute them. For example, the `serializeCDAMagnet(cda)` method returns a serialized CDA as a magent link:
 
 ```json
-iota://MBREWACWIPRFJRDYYHAAME…AMOIDZCYKW/?timeout_at=1548337187&multi_use=true&expected_amount=0
+iota://MBREWACWIPRFJRDYYHAAME…AMOIDZCYKW/?timeout_at=1548337187&multi_use=1&expected_amount=0
 ```
 
 1. To parse a magnet link into a CDA, use the `parseCDAMagnet()` method
 
     ```js
-    const { address, timeoutAt, expectedAmount } = account.parseCDAMagnet(
-        cda.magnetLink
+    import { parseMagnetLink } from '@iota/cda'
+        
+    const magnetLink = 'iota://MBREWACWIPRFJRDYYHAAME…AMOIDZCYKW/?timeout_at=1548337187&multi_use=1&expected_amount=0'
+    const { address, timeoutAt, multiUse, expectedAmount } = parseCDAMagnet(
+        magnetLink
     );
     ```
 
@@ -96,27 +98,46 @@ iota://MBREWACWIPRFJRDYYHAAME…AMOIDZCYKW/?timeout_at=1548337187&multi_use=true
 
 1. After making sure that the CDA is still active, use the `sendToCDA()` method to deposit IOTA tokens into it
 
-    ```js
+    ```js   
     account.sendToCDA({
-    address: 'AT9GOVPQDDKAJ...ADFA9IRSV' // must include the checksum
-    multiUse: false,
-    timeoutAt: 6833278800,
-    expectedAmount: 10000000,
+        address: 'AT9GOVPQDDKAJ...ADFA9IRSV', // must include the checksum
+        multiUse: false,
+        timeoutAt: 6833278800,
+        expectedAmount: 10000000,
+        value: 10000000
     })
-        .then((transactions) => {
-            const tailHash = transactions[0].hash
-            console.log('Successfully attached a bundle with tail hash:', tailHash)
+         .then((trytes) => {
+            console.log('Successfully prepared transaction trytes:', trytes)
         })
         .catch(err => {
             // Handle errors here...
         });
+
+    // start attachments of transactions
+    account.startAttaching({
+        depth: 3,
+        minWeightMagnitude(9),
+        delay: 30 * 1000 // 30s
+    })
+    
+    // or stop
+    account.stopAttaching()
     ```
 
-2. **Optional:** To use a magnet link, pass it to the `sendToCDA()` method
+2. **Optional:** To use a magnet link, use `parseCDAMagnet()` and pass the results to the`sendToCDA()` method
 
     ```js
+     const magnetLink = 'iota://MBREWACWIPRFJRDYYHAAME…AMOIDZCYKW/?timeout_at=1548337187&multi_use=1&expected_amount=0'
+     const { address, timeoutAt, multiUse, expectedAmount } = parseCDAMagnet(
+        magnetLink
+    );
+
     account.sendToCDA({
-        magnetLink: magnetLink
+        address,
+        timeoutAt,
+        multiUse,
+        expectedAmount,
+        value: 1 // value to send to the CDA
     })
         .then()
         .catch();
